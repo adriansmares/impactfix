@@ -238,6 +238,9 @@ class ExtensionConfig(object):
       cxx.cflags += ['-Wno-varargs']
     if cxx.version >= 'clang-3.4' or cxx.version >= 'apple-clang-7.0':
       cxx.cxxflags += ['-Wno-inconsistent-missing-override']
+    if cxx.version >= 'clang-20':
+      # hl2sdk's vphysics_interface.h memsets non-trivial types; clang 20 started warning about it.
+      cxx.cxxflags += ['-Wno-nontrivial-memcall']
     if cxx.version >= 'clang-2.9' or cxx.version >= 'apple-clang-3.0':
       cxx.cxxflags += ['-Wno-null-dereference']
     if have_clang or (cxx.version >= 'gcc-4.6'):
@@ -426,7 +429,7 @@ class ExtensionConfig(object):
 
     compiler.defines += ['SOURCE_ENGINE=' + sdk.code]
 
-    if sdk.name in ['sdk2013', 'bms'] and compiler.like('gcc'):
+    if sdk.name in ['sdk2013', 'bms', 'pvkii', 'tf2', 'css', 'dods', 'hl2dm', 'l4d2'] and compiler.like('gcc'):
       # The 2013 SDK already has these in public/tier0/basetypes.h
       compiler.defines.remove('stricmp=strcasecmp')
       compiler.defines.remove('_stricmp=strcasecmp')
