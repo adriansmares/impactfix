@@ -1,0 +1,45 @@
+# vim: set sts=2 ts=8 sw=2 tw=99 et ft=python:
+import os
+
+projectName = 'impactfix'
+
+sourceFiles = [
+  'src/extension.cpp',
+  os.path.join(Extension.sm_root, 'public', 'CDetour', 'detours.cpp'),
+]
+
+# SourceMod's CDetour is built on safetyhook. Build it the way SourceMod does, from a submodule pinned to the same
+# commit as SourceMod's public/safetyhook.
+class SafetyHookShim(object):
+  def __init__(self):
+    self.all_targets = Extension.all_targets
+    self.libsafetyhook = {}
+
+SafetyHook = SafetyHookShim()
+builder.Build('safetyhook/AMBuilder', {'SafetyHook': SafetyHook})
+
+project = builder.LibraryProject(projectName)
+project.sources += [os.path.join(Extension.sm_root, 'public', 'smsdk_ext.cpp')]
+project.sources += sourceFiles
+
+for sdk_name in Extension.sdks:
+  sdk = Extension.sdks[sdk_name]
+  if sdk['name'] in ['mock']:
+    continue
+
+  for cxx in builder.targets:
+    if not cxx.target.arch in sdk['platforms'][cxx.target.platform]:
+      continue
+
+    binary = Extension.HL2ExtConfig(project, builder, cxx, projectName + '.ext.' + sdk['extension'], sdk)
+    binary.compiler.cxxincludes += [
+      os.path.join(builder.sourcePath, 'src'),
+      os.path.join(builder.sourcePath, 'safetyhook', 'include'),
+    ]
+    binary.compiler.linkflags += [task.binary for task in SafetyHook.libsafetyhook if task.target.arch == cxx.target.arch]
+
+    # Exception: hl2sdk's vphysics_interface.h memsets non-trivial types, which clang 20 and later reject.
+    if binary.compiler.family == 'clang' and binary.compiler.version >= 'clang-20':
+      binary.compiler.cxxflags += ['-Wno-nontrivial-memcall']
+
+Extension.extensions += builder.Add(project)
